@@ -16,8 +16,8 @@ CCFLAGS  = -m32 -ffreestanding -fno-stack-protector -fno-pic \
            -nostdlib -nostdinc -fno-builtin \
            -I./include \
            -Wall -Wextra -Wno-unused-parameter \
-           -O2
-LDFLAGS  = -m elf_i386 -T kernel.ld --oformat binary
+           -O0
+LDFLAGS  = -m elf_i386 -e _start -T kernel.ld --oformat binary -n
 
 # --- Output ---
 BUILD   = build

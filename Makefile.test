@@ -1,0 +1,54 @@
+# Simple incremental build tester
+all: clean test_asm test_c test_link test_final
+
+clean:
+	rm -rf build/ myos.img *.o
+
+test_asm:
+	mkdir -p build/boot build/kernel
+	nasm -f bin boot/boot.asm -o build/boot.bin
+	nasm -f bin boot/stage2.asm -o build/stage2.bin
+	nasm -f elf32 boot/kernel_entry.asm -o build/boot/kernel_entry.o  
+	nasm -f elf32 kernel/gdt_flush.asm -o build/kernel/gdt_flush.o
+	nasm -f elf32 kernel/idt_stubs.asm -o build/kernel/idt_stubs.o
+	@echo "[✓] All ASM compiled successfully"
+
+test_c:
+	mkdir -p build/kernel build/drivers build/fs
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/gdt.c -o build/kernel/gdt.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/idt.c -o build/kernel/idt.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/memory.c -o build/kernel/memory.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/scheduler.c -o build/kernel/scheduler.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/kernel.c -o build/kernel/kernel.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c kernel/shell.c -o build/kernel/shell.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c drivers/vga.c -o build/drivers/vga.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c drivers/keyboard.c -o build/drivers/keyboard.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c drivers/timer.c -o build/drivers/timer.o
+	gcc -m32 -ffreestanding -fno-stack-protector -I./include -c fs/fs.c -o build/fs/fs.o
+	@echo "[✓] All C files compiled successfully"
+
+test_link:
+	ld -m elf_i386 -e _start -T kernel.ld --oformat binary -n -o build/kernel.bin \
+		build/boot/kernel_entry.o \
+		build/kernel/gdt_flush.o \
+		build/kernel/idt_stubs.o \
+		build/kernel/kernel.o \
+		build/kernel/gdt.o \
+		build/kernel/idt.o \
+		build/kernel/memory.o \
+		build/kernel/scheduler.o \
+		build/kernel/shell.o \
+		build/drivers/vga.o \
+		build/drivers/keyboard.o \
+		build/drivers/timer.o \
+		build/fs/fs.o
+	@echo "[✓] Kernel linked successfully"
+	ls -lh build/kernel.bin
+
+test_final:
+	dd if=/dev/zero of=myos.img bs=512 count=2880 2>/dev/null
+	dd if=build/boot.bin of=myos.img bs=512 count=1 conv=notrunc 2>/dev/null
+	dd if=build/stage2.bin of=myos.img bs=512 seek=1 count=4 conv=notrunc 2>/dev/null
+	dd if=build/kernel.bin of=myos.img bs=512 seek=5 conv=notrunc 2>/dev/null
+	@echo "[✓✓✓] myos.img created successfully!"
+	ls -lh myos.img
